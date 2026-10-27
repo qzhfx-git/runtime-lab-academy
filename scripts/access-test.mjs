@@ -20,6 +20,15 @@ const navigation={...req('localhost:3210',null,{'sec-fetch-site':'cross-site','s
 assert(cloud.allows(navigation));
 assert(!cloud.allows({...navigation,url:'/api/bootstrap'}));
 assert(!cloud.allows({...navigation,method:'POST'}));
+const readiness={...req('localhost:3210',null,{'sec-fetch-site':'cross-site','sec-fetch-dest':'image'}),method:'GET',url:'/lab-ready.png?attempt='+'a'.repeat(32)};
+assert(cloud.allows(readiness));
+assert(!local.allows({...readiness,headers:{...readiness.headers,host:'127.0.0.1:3210'}}));
+assert(!cloud.allows({...readiness,method:'POST'}));
+assert(!cloud.allows({...readiness,url:'/api/bootstrap?attempt='+'a'.repeat(32)}));
+assert(!cloud.allows({...readiness,url:'/lab-ready.png?attempt='+'a'.repeat(32)+'&extra=x'}));
+assert(!cloud.allows({...readiness,headers:{...readiness.headers,'sec-fetch-dest':'document'}}));
+assert(!cloud.allows({...readiness,headers:{...readiness.headers,host:'evil.test'}}));
+assert(!cloud.allows({...readiness,headers:{...readiness.headers,origin:'https://evil.test'}}));
 assert(!cloud.allows(req('other-3210.app.github.dev','https://other-3210.app.github.dev')));
 assert(!cloud.allows(req('evil.test',null,{'x-forwarded-host':host})));
 assert.throws(()=>serverAccess({CODESPACES:'true',CODESPACE_NAME:'../bad'}));

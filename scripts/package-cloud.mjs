@@ -11,7 +11,7 @@ const sourceFiles=[
  'language-service.mjs','project-bundle.mjs','server-access.mjs','server.mjs','studies-catalog.mjs',
  'study-models.mjs','study-projects.mjs','study-schema.mjs','workspace-schema.mjs',
  'engineering-test.mjs','language-test.mjs','engineering-language-test.mjs',
- 'CLOUD-LAB.md','package.json','package-lock.json','.gitignore',
+ 'CLOUD-LAB.md','cloud-lab-config.json','package.json','package-lock.json','.gitignore',
  'bridge.mjs','bridge-data.json','bridge-README.md','start-bridge.ps1','check-environment.ps1','install-language-tools.ps1'
 ];
 await fs.rm(out,{recursive:true,force:true});await fs.mkdir(out,{recursive:true});

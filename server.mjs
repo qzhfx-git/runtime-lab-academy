@@ -15,7 +15,7 @@ import {validateWorkspace} from './workspace-schema.mjs';
 import {studies,studyCourses} from './studies-catalog.mjs';
 import {studyStageDefinitions,studyReferenceFiles} from './study-projects.mjs';
 import {validateStudyRecord,workspaceStudySummary,studyWorkspaceProjection} from './study-schema.mjs';
-import {serverAccess} from './server-access.mjs';
+import {serverAccess,isLabReadinessRequest} from './server-access.mjs';
 
 setupRunner();
 const exercises=new Map(curriculum.exercises.map(e=>[e.id,e]));
@@ -69,6 +69,12 @@ function progress(){
 const server=http.createServer(async(req,res)=>{
  try{
   if(!access.allows(req))return json(res,403,{error:'仅接受学习站自身的请求：'+origin});
+  if(access.codespaces&&isLabReadinessRequest(req)){
+   // A non-sensitive readiness image, still behind GitHub's private-port login.
+   // Never expose a bootstrap token, compiler details or learning records here.
+   res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+   return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMoPPX/PwAHJAM6CU8XxwAAAABJRU5ErkJggg==','base64'));
+  }
   const url=new URL(req.url,origin);
   if(url.pathname==='/api/health'&&req.method==='GET')return json(res,200,{app:'cpp-runtime-lab',version:'2.0.0',compiler:compilerVersion});
   if(url.pathname==='/api/bootstrap'&&req.method==='GET'){

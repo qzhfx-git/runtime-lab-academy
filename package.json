@@ -7,7 +7,7 @@
     "start": "node server.mjs",
     "build:editor": "node editor-src/build.mjs",
     "build:portal": "node scripts/build-portal.mjs",
-    "test:cloud": "node scripts/access-test.mjs && node scripts/execution-smoke.mjs && node language-test.mjs && node engineering-test.mjs",
+    "test:cloud": "node scripts/access-test.mjs && node scripts/cloud-launcher-test.mjs && node scripts/execution-smoke.mjs && node language-test.mjs && node engineering-test.mjs",
     "test:engineering": "node engineering-test.mjs",
     "test:language": "node language-test.mjs",
     "test:engineering-language": "node engineering-language-test.mjs",
