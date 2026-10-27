@@ -124,8 +124,8 @@ export async function judge(exercise,code,mode,{signal,onStage=()=>{}}={}){
       let status='PASS';
       if(actual.reason==='cancelled'){result.status='CANCELLED';return result;}
       if(actual.reason==='timeout'){status='IE';actual.stderr+='执行器启动或回收超时，请重试；这不代表你的程序超过运行时限。';}
-      else if(actual.code===124)status='TLE';
       else if(actual.reason==='output-limit')status='OLE';
+      else if(actual.code===124)status='TLE';
       else if(actual.code===125)status='IE';
       else if(actual.code!==0)status='RE';
       else if(normalize(actual.stdout)!==normalize(exercise.tests[i].expected))status='WA';

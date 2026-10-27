@@ -10,6 +10,12 @@ const cloud=serverAccess({CODESPACES:'true',CODESPACE_NAME:'test-runtime-lab'},3
 assert.equal(cloud.origin,'https://'+host);
 assert(cloud.allows(req(host,'https://'+host)));
 assert(cloud.allows(req('127.0.0.1:3210','https://'+host)));
+assert(cloud.allows(req('localhost:3210','https://'+host)));
+assert(!local.allows(req('localhost:3210')));
+const navigation={...req('localhost:3210',null,{'sec-fetch-site':'cross-site','sec-fetch-mode':'navigate','sec-fetch-dest':'document'}),method:'GET',url:'/'};
+assert(cloud.allows(navigation));
+assert(!cloud.allows({...navigation,url:'/api/bootstrap'}));
+assert(!cloud.allows({...navigation,method:'POST'}));
 assert(!cloud.allows(req('other-3210.app.github.dev','https://other-3210.app.github.dev')));
 assert(!cloud.allows(req('evil.test',null,{'x-forwarded-host':host})));
 assert.throws(()=>serverAccess({CODESPACES:'true',CODESPACE_NAME:'../bad'}));

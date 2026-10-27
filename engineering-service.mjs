@@ -12,6 +12,11 @@ export function sourceHash(files){return createHash('sha256').update(JSON.string
 function tool(name){const candidates=[process.env['LAB_'+name.toUpperCase()],path.join(path.dirname(compiler),name+'.exe'),...(process.env.PATH||'').split(path.delimiter).map(p=>path.join(p,name+(process.platform==='win32'?'.exe':'')))];return candidates.find(p=>p&&fs.existsSync(p));}
 export function toolchainProfiles(){const clang=[process.env.LAB_CLANGXX,tool('clang++'),'C:/Program Files/LLVM/bin/clang++.exe','C:/msys64/clang64/bin/clang++.exe'].find(p=>p&&fs.existsSync(p));const msvc=process.env.LAB_MSVC||tool('cl');return [{id:'gcc',label:process.platform==='linux'?'Linux GCC':'当前 GCC / MinGW',compiler,available:fs.existsSync(compiler)},{id:'clang',label:'Clang',compiler:clang||null,available:!!clang},{id:'msvc',label:'MSVC 开发环境',compiler:msvc||null,available:!!msvc&&fs.existsSync(msvc)},...(process.platform==='win32'?[{id:'linux',label:'Linux GCC / Clang + sanitizers',compiler:null,available:false,external:true,message:'此连接器使用 Windows 执行器。导出工程后用 tools/verify.sh 或附带 CI 在 Linux 执行；本网站尚未运行该平台。'}]:[])];}
 const expressionEscape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+export function sanitizerVerdict(evidence){
+ const failures=evidence.filter(x=>x.status!=='pass');
+ if(failures.some(x=>!/FATAL: ThreadSanitizer: unexpected memory mapping/.test(x.output)))return 'fail';
+ return !evidence.length||failures.length?'blocked':'pass';
+}
 export class EngineeringService{
  constructor({runtimeDir=path.join(root,'.runtime/engineering')}={}){
   this.parent=path.resolve(runtimeDir);this.root=path.join(this.parent,`${process.pid}-${randomUUID()}`);this.jobs=new Map();this.sessions=new Map();this.active=null;this.debug=null;this.runner=runner;this.disposed=false;
@@ -112,7 +117,8 @@ export class EngineeringService{
    const flags='-fsanitize='+(kind==='address'?'address,undefined':'thread')+' -fno-omit-frame-pointer';const b=await this.build(s,job,kind,flags);
    if(!b.ok){job.checks.push({name,status:'fail',output:b.output});continue;}
    const tests=await this.discover(s,job,b.build);const evidence=[];for(const t of tests)evidence.push(await this.test(s,job,b.build,t));
-   job.checks.push({name,status:!evidence.length?'blocked':evidence.every(x=>x.status==='pass')?'pass':'fail',output:evidence.map(x=>x.output).join('\n').slice(-40000),tests:evidence});
+   const status=sanitizerVerdict(evidence);
+   job.checks.push({name,status,output:(status==='blocked'?'检测未能完成；请查看环境诊断，本项不计为通过。\n':'')+evidence.map(x=>x.output).join('\n').slice(-40000),tests:evidence});
   }
   const bench=s.tests.find(t=>t.labels.includes('benchmark'));
   if(bench){const samples=[];for(let n=0;n<3;n++)samples.push(await this.test(s,job,s.build,bench));const times=samples.map(x=>x.ms).sort((a,b)=>a-b);job.checks.push({name:'性能采样 · 3 次',status:samples.every(x=>x.status==='pass')?'info':'fail',output:`进程级墙钟时间：${samples.map(x=>x.ms).join(', ')} ms；中位数 ${times[1]} ms。包含 CTest/进程启动开销，无性能合格线。程序内部计时见下方；Debug 结果不可代替 Release 基准。\n`+samples.map(x=>x.output).join('\n'),samples:times});}

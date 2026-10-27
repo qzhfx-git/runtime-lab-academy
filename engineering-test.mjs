@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {setTimeout as delay} from 'node:timers/promises';
 import {setupRunner} from './judge.mjs';
-import {EngineeringService,validateFiles} from './engineering-service.mjs';
+import {EngineeringService,validateFiles,sanitizerVerdict} from './engineering-service.mjs';
 import {engineeringTemplates} from './engineering-templates.mjs';
 import {parseMI} from './gdb-service.mjs';
 setupRunner();
@@ -9,6 +9,9 @@ const files=structuredClone(engineeringTemplates[0].files),service=new Engineeri
 async function run(mode,source=files,extra={}){const started=await service.handle({op:'start',mode,files:source,...extra});for(let n=0;n<240;n++){const job=await service.handle({op:'job',id:started.id});if(job.done)return job;await delay(500);}throw new Error('test timed out');}
 async function paused(){for(let n=0;n<100;n++){const r=await service.handle({op:'inspect',session:service.debug.session});if(r.state==='paused')return r;if(r.state==='exited')throw new Error('GDB exited: '+r.output);await delay(150);}throw new Error('GDB did not pause');}
 try{
+ assert.equal(sanitizerVerdict([{status:'fail',output:'FATAL: ThreadSanitizer: unexpected memory mapping 0x123'}]),'blocked');
+ assert.equal(sanitizerVerdict([{status:'fail',output:'WARNING: ThreadSanitizer: data race'}]),'fail');
+ assert.equal(sanitizerVerdict([{status:'fail',output:'FATAL: ThreadSanitizer: unexpected memory mapping'},{status:'fail',output:'heap-use-after-free'}]),'fail');
  assert.deepEqual(parseMI('stack=[frame={level="0",func="main",args=[{name="x",value="7"}]}],a="escaped\\ntext"'),{stack:[{frame:{level:'0',func:'main',args:[{name:'x',value:'7'}]}}],a:'escaped\ntext'});
  for(const name of ['../escape.cpp','C:/x.cpp','src/CON.cpp','src/./x.cpp','src//x.cpp'])assert.throws(()=>validateFiles({'CMakeLists.txt':'x',[name]:'x'}));
  assert.throws(()=>validateFiles({'CMakeLists.txt':'x','A.cpp':'x','a.cpp':'x'}));
