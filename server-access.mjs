@@ -8,7 +8,7 @@ export function serverAccess(env=process.env,port=3210){
   external=`https://${name}-${port}.${domain}`;
   origins.add(external);hosts.add(new URL(external).host);
   // Codespaces rewrites same-site Host and Origin to localhost on forwarding.
-  hosts.add('localhost:'+port);origins.add('http://localhost:'+port);
+  hosts.add('localhost:'+port);origins.add('https://localhost:'+port);
  }
  return {origin:external||'http://'+local,codespaces:!!external,allows(req){
   const navigation=!!external&&req.method==='GET'&&req.url==='/'&&req.headers['sec-fetch-mode']==='navigate'&&req.headers['sec-fetch-dest']==='document';
