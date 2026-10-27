@@ -1,0 +1,26 @@
+{
+  "name": "cpp-runtime-lab",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build:editor": "node editor-src/build.mjs",
+    "build:portal": "node scripts/build-portal.mjs",
+    "test:cloud": "node scripts/access-test.mjs && node scripts/execution-smoke.mjs && node language-test.mjs && node engineering-test.mjs",
+    "test:engineering": "node engineering-test.mjs",
+    "test:language": "node language-test.mjs",
+    "test:engineering-language": "node engineering-language-test.mjs",
+    "preview:portal": "node scripts/preview-portal.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@codemirror/lang-cpp": "6.0.3",
+    "@codemirror/theme-one-dark": "6.1.3",
+    "@wasm-fmt/clang-format": "23.1.1",
+    "codemirror": "6.0.2",
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,7 @@
+.data/
+.runtime/
+node_modules/
+*.log
+
+dist-portal/
+release/

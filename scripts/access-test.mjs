@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {serverAccess} from '../server-access.mjs';
+const req=(host,origin,extra={})=>({headers:{host,...(origin?{origin}:{}),...extra}});
+const local=serverAccess({},3210);
+assert(local.allows(req('127.0.0.1:3210','http://127.0.0.1:3210')));
+assert(!local.allows(req('evil.test')));
+assert(!local.allows(req('127.0.0.1:3210','https://evil.test')));
+assert(!local.allows(req('127.0.0.1:3210',null,{'sec-fetch-site':'cross-site'})));
+const cloud=serverAccess({CODESPACES:'true',CODESPACE_NAME:'test-runtime-lab'},3210),host='test-runtime-lab-3210.app.github.dev';
+assert.equal(cloud.origin,'https://'+host);
+assert(cloud.allows(req(host,'https://'+host)));
+assert(cloud.allows(req('127.0.0.1:3210','https://'+host)));
+assert(!cloud.allows(req('other-3210.app.github.dev','https://other-3210.app.github.dev')));
+assert(!cloud.allows(req('evil.test',null,{'x-forwarded-host':host})));
+assert.throws(()=>serverAccess({CODESPACES:'true',CODESPACE_NAME:'../bad'}));
+assert.throws(()=>serverAccess({CODESPACES:'true',CODESPACE_NAME:'test-runtime-lab',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'evil.test'}));
+console.log('PASS: local and Codespaces exact-origin access; rejects foreign hosts, origins and forged forwarding headers');

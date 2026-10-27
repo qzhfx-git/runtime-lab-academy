@@ -1,0 +1,45 @@
+.code-wrap.rich-editor { display:block; height:460px; min-height:300px; background:#0b101b; overflow:hidden; }
+.rich-editor > .line-numbers, .rich-editor > .code-surface { display:none; }
+.rich-code { height:100%; width:100%; }
+.editor-tools { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding:9px 14px; border-bottom:1px solid #ffffff0b; background:#101724; color:#93a4bd; font-size:11px; }
+.editor-tool-actions,.editor-tool-settings { display:flex; align-items:center; gap:10px; }
+.editor-tools button { color:#c0cde2; background:transparent; border:0; border-radius:5px; padding:5px 7px; cursor:pointer; font:inherit; }
+.editor-tools button:hover,.editor-tools button[aria-pressed=true] { background:#8ab8ff16; color:#9bc7ff; }
+.editor-tools button:disabled { opacity:.5; cursor:wait; }
+.editor-tools kbd { margin-left:5px; font-size:10px; color:#7789a4; border:0; background:none; }
+.editor-tools select { background:#101724; color:#c0cde2; border:0; font:inherit; padding:3px; }
+.editor-help { position:relative; }
+.editor-help summary { cursor:pointer; border:1px solid #5b6c8666; border-radius:50%; width:19px; height:19px; text-align:center; list-style:none; }
+.editor-help > div { position:absolute; z-index:20; right:0; top:28px; width:min(330px,80vw); padding:18px; background:#141d2e; border:1px solid #354058; border-radius:12px; box-shadow:0 18px 50px #0008; font-size:12px; line-height:1.8; }
+.editor-help p { margin:10px 0 0; }
+.editor-help strong { color:#e1eafb; }
+.cpp-hover { max-width:min(380px,85vw); padding:12px 15px; font-size:12px; line-height:1.7; color:#bdcce3; white-space:normal; }
+.cpp-hover strong { color:#a9cdff; font-family:Consolas,monospace; }
+.cpp-hover p { margin:6px 0 0; }
+.cm-tooltip.cm-completionInfo { max-width:340px; padding:12px; font-family:inherit; font-size:12px; line-height:1.7; color:#c2d0e5; }
+.cm-tooltip-autocomplete > ul { max-height:260px !important; }
+.cm-tooltip-autocomplete > ul > li { padding:4px 8px !important; }
+.cm-panels { font-family:inherit; }
+.focus-mode .code-wrap.rich-editor { height:65vh; }
+.language-panel { border-bottom:1px solid #ffffff0c; background:#0c1421; font-size:12px; color:#a6b5ce; }
+.language-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding:8px 16px; }
+.language-status::before { content:'●'; font-size:8px; color:#70839e; margin-right:7px; }
+.language-status[data-kind=ready]::before { color:#78d9b1; }
+.language-status[data-kind=error]::before { color:#ff778e; }
+.language-status[data-kind=warning]::before { color:#e9bb72; }
+.language-actions { display:flex; align-items:center; gap:10px; }
+.language-actions button,.signature-heading button { font:inherit; color:#a8c9fb; background:transparent; border:0; cursor:pointer; padding:3px 5px; border-radius:4px; }
+.language-actions button:hover,.signature-heading button:hover { background:#8ab8ff18; }
+.language-unavailable { margin:0; padding:0 16px 12px; font-size:11px; line-height:1.8; color:#d3b787; }
+.signature-help { border-top:1px solid #9cc6ff15; padding:10px 16px 14px; background:linear-gradient(100deg,#132034,#111827); max-height:180px; overflow:auto; }
+.signature-help[hidden],.language-actions [hidden] { display:none; }
+.signature-heading { display:flex; gap:8px; align-items:center; margin-bottom:8px; color:#7f9abc; font-size:11px; }
+.signature-heading button:last-child { margin-left:auto; }
+.signature-help > code { display:block; font-size:13px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; color:#c2d2ec; background:transparent; padding:0; }
+.signature-help mark { background:#7caeff25; color:#b8d5ff; border-radius:3px; padding:1px 2px; font-weight:700; }
+.signature-help p { margin:6px 0 0; font-size:11px; line-height:1.6; }
+.semantic-hover { max-width:min(520px,85vw); max-height:260px; overflow:auto; white-space:pre-wrap; font:12px/1.7 Consolas,monospace; color:#c5d8f0; padding:12px 16px; }
+.cm-panel.cm-panel-lint { max-height:180px; background:#101827; }
+.cm-panel-lint ul { font-size:12px; line-height:1.7; }
+.cm-diagnostic { font-size:12px; line-height:1.65; white-space:pre-wrap; }
+@media(max-width:700px) { .code-wrap.rich-editor { height:380px; } .editor-tools { padding:8px; } .editor-tools kbd { display:none; } .editor-tool-actions,.editor-tool-settings { gap:4px; } .cm-tooltip.cm-completionInfo { max-width:200px; } }

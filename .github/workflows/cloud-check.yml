@@ -1,0 +1,22 @@
+name: Linux execution and debugging
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y g++ clang clangd cmake ninja-build gdb
+      - run: node scripts/setup-codespaces.mjs
+      - run: npm run test:cloud
+        env:
+          CPP_COMPILER: /usr/bin/g++
+          LAB_CLANGD: /usr/bin/clangd

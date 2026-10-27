@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {EditorState} from '@codemirror/state';
+import {CompletionContext} from '@codemirror/autocomplete';
+import {cpp} from '@codemirror/lang-cpp';
+import {ensureSyntaxTree} from '@codemirror/language';
+import {format} from '@wasm-fmt/clang-format/node';
+import {completionSource,formattedOffset,insertSpaces} from './editor.js';
+const complete=(doc,explicit=true)=>{const state=EditorState.create({doc,extensions:[cpp()]});ensureSyntaxTree(state,doc.length,100);return completionSource('struct Player { int hp; };')(new CompletionContext(state,doc.length,explicit));};
+assert(complete('std::make_sh').options.some(x=>x.label==='std::make_shared'));
+assert(complete('Pla').options.some(x=>x.label==='Player'));
+assert(complete('observer.').options.some(x=>x.label==='lock'));
+assert(!complete('observer.').options.some(x=>x.label==='std::mutex'));
+assert.equal(complete('// std::make_sh'),null);
+assert.equal(complete('"std::make_sh'),null);
+assert.equal(complete('123'),null);
+assert(complete('crtp').options.some(x=>x.label==='crtp-base'&&typeof x.apply==='function'));
+const middleState=EditorState.create({doc:'std::shared_ptr<Player>',extensions:[cpp()]});
+const middle=completionSource()(new CompletionContext(middleState,8,true));
+assert.equal(middle.from,0);assert.equal(middle.to,15);
+const tabState=EditorState.create({doc:'  ',selection:{anchor:2},extensions:[EditorState.tabSize.of(4)]});
+insertSpaces({state:tabState,dispatch:transaction=>assert.equal(transaction.state.doc.toString(),'    ')});
+const source='#include <memory>\n// 中文说明\nint f(){const char* s="a   b"; if(s){return 1;}return 0;}';
+for(const indent of [2,4]){
+ const style=JSON.stringify({BasedOnStyle:'LLVM',IndentWidth:indent,SortIncludes:'Never',AllowShortFunctionsOnASingleLine:'Empty'});
+ const result=format(source,'solution.cpp',style);
+ assert(result.includes('\n'+' '.repeat(indent)+'const char'));
+ assert(result.includes('"a   b"'));
+ assert(result.includes('// 中文说明'));
+ assert.equal(format(result,'solution.cpp',style),result);
+ const oldPos=source.indexOf('return')+6,newPos=formattedOffset(source,result,oldPos);
+ assert.equal(result.slice(newPos-6,newPos),'return');
+}
+console.log('Editor checks passed: contextual completions, comments/strings, snippets, ClangFormat, caret mapping.');

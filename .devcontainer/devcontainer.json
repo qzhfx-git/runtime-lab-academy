@@ -1,0 +1,19 @@
+{
+  "name": "Runtime Lab · C++20",
+  "build": { "dockerfile": "Dockerfile", "context": ".." },
+  "features": { "ghcr.io/devcontainers/features/node:1": { "version": "24" } },
+  "remoteUser": "vscode",
+  "hostRequirements": { "cpus": 2 },
+  "capAdd": ["SYS_PTRACE"],
+  "forwardPorts": [3210],
+  "portsAttributes": { "3210": { "label": "Runtime Lab · 个人云实验室", "onAutoForward": "openBrowser" } },
+  "postCreateCommand": "node scripts/setup-codespaces.mjs",
+  "postStartCommand": "node scripts/start-codespaces.mjs",
+  "customizations": {
+    "vscode": {
+      "extensions": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cpptools", "ms-vscode.cmake-tools"],
+      "settings": { "C_Cpp.intelliSenseEngine": "disabled", "files.autoSave": "afterDelay", "editor.formatOnSave": true }
+    },
+    "codespaces": { "openFiles": ["CLOUD-LAB.md"] }
+  }
+}

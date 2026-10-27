@@ -1,0 +1,604 @@
+{
+  "roadmap": [
+    {
+      "id": "objects",
+      "phase": "Phase 1",
+      "name": "对象、存储与生命周期",
+      "summary": "区分分配空间、构造对象、销毁对象。",
+      "status": "available"
+    },
+    {
+      "id": "layout",
+      "phase": "Phase 1.5",
+      "name": "对齐与内存布局",
+      "summary": "从 alignment / padding 走向数据布局。",
+      "status": "available"
+    },
+    {
+      "id": "ownership",
+      "phase": "Phase 2",
+      "name": "所有权与资源管理",
+      "summary": "接续上次的 control block，从 weak_ptr 继续。",
+      "status": "current"
+    },
+    {
+      "id": "move",
+      "phase": "Phase 3",
+      "name": "移动语义与容器",
+      "summary": "理解资源转移、对象身份和异常保证。",
+      "status": "available"
+    },
+    {
+      "id": "allocator",
+      "phase": "原路线后续主题",
+      "name": "Allocator 与高性能数据结构",
+      "summary": "Arena 入门实验已开放。",
+      "status": "available"
+    },
+    {
+      "id": "ecs",
+      "phase": "原路线后续主题",
+      "name": "ECS 与数据导向设计",
+      "summary": "AoS / SoA、组件存储与 Chunk。",
+      "status": "planned"
+    },
+    {
+      "id": "jobs",
+      "phase": "原路线后续主题",
+      "name": "Job System 与 Lock-free",
+      "summary": "任务依赖、内存序与并发验证。",
+      "status": "planned"
+    },
+    {
+      "id": "runtime",
+      "phase": "综合项目",
+      "name": "TinyRuntime",
+      "summary": "组合分配器、容器、组件与任务调度。",
+      "status": "planned"
+    }
+  ],
+  "exercises": [
+    {
+      "id": "weak-lock",
+      "topic": "ownership",
+      "title": "让观察者安全取得所有权",
+      "subtitle": "weak_ptr / lock / control block",
+      "difficulty": "从上次继续",
+      "minutes": 15,
+      "objective": "实现 acquire：从 weak_ptr<Player> 尝试取得共享所有权。对象已经销毁或观察者为空时，返回空 shared_ptr。不能从裸指针重新创建所有权。",
+      "contract": [
+        "Player 由题目提供，成员 hp 为生命值，静态成员 alive 记录存活对象数。",
+        "返回值必须与已有的 shared_ptr 共享控制块，不得复制 Player。",
+        "测试器提供 main()，你只需补全函数。"
+      ],
+      "guide": [
+        "shared_ptr 的访问地址与所有权控制块是两套概念。复制 shared_ptr 会共享控制块；从 get() 得到的裸指针重新构造 shared_ptr 会建立独立所有权。",
+        "weak_ptr 不增加强引用计数。最后一个共享所有者释放后，被管理对象销毁；观察者仍可关联控制块。",
+        "lock() 原子地尝试取得共享所有权，失败返回空指针。它不需要先调用 expired() 再手动取得裸指针。"
+      ],
+      "hints": [
+        "你需要的操作由 weak_ptr 自身提供，不需要 new。",
+        "考虑 lock() 的返回类型和失败行为。"
+      ],
+      "starter": "std::shared_ptr<Player> acquire(const std::weak_ptr<Player>& observer) {\n    // TODO: 尝试取得已有的共享所有权\n    return {};\n}\n",
+      "solution": "std::shared_ptr<Player> acquire(const std::weak_ptr<Player>& observer) {\n    return observer.lock();\n}\n",
+      "tests": [
+        {
+          "name": "存活对象",
+          "body": "auto p=std::make_shared<Player>(80);auto q=acquire(p);std::cout<<(q?q->hp:-1)<<' '<<p.use_count();",
+          "expected": "80 2",
+          "explanation": "返回同一个对象，并增加原控制块的强引用。"
+        },
+        {
+          "name": "空观察者",
+          "body": "std::weak_ptr<Player>w;std::cout<<bool(acquire(w));",
+          "expected": "0",
+          "explanation": "空 weak_ptr 应得到空 shared_ptr。"
+        },
+        {
+          "name": "最后一个所有者已释放",
+          "body": "std::weak_ptr<Player>w;{auto p=std::make_shared<Player>();w=p;}auto q=acquire(w);std::cout<<bool(q)<<' '<<Player::alive;",
+          "expected": "0 0",
+          "explanation": "观察者不会保活对象。"
+        },
+        {
+          "name": "返回值保活对象",
+          "body": "auto p=std::make_shared<Player>(42);auto q=acquire(p);p.reset();std::cout<<(q?q->hp:-1)<<' '<<Player::alive;q.reset();std::cout<<' '<<Player::alive;",
+          "expected": "42 1 0",
+          "explanation": "新的强引用保活对象，释放后对象销毁。"
+        },
+        {
+          "name": "控制块身份",
+          "body": "auto p=std::make_shared<Player>();auto q=acquire(p);std::cout<<(q&&!p.owner_before(q)&&!q.owner_before(p))<<' '<<(p.get()==q.get());",
+          "expected": "1 1",
+          "explanation": "地址和所有权都必须相同。"
+        }
+      ]
+    },
+    {
+      "id": "shared-self",
+      "topic": "ownership",
+      "title": "从 this 找回已有的所有权",
+      "subtitle": "enable_shared_from_this / ownership identity",
+      "minutes": 20,
+      "difficulty": "巩固",
+      "objective": "完成 Session::self()，返回共享原控制块的 shared_ptr。已有所有权时应成功；尚无共享所有权时，让标准 bad_weak_ptr 异常传出。",
+      "contract": [
+        "保持继承 enable_shared_from_this<Session>。",
+        "禁止使用 shared_ptr<Session>(this) 创建新的控制块。"
+      ],
+      "guide": [
+        "this 只描述地址，并不携带所有权信息。shared_ptr(this) 会试图建立另一份独立所有权。",
+        "enable_shared_from_this 在首次被合适的 shared_ptr 管理时关联已有控制块。shared_from_this() 使用这份关联。",
+        "不要在构造函数里依赖 shared_from_this()：此时共享所有权关联还未建立。"
+      ],
+      "hints": [
+        "使用继承来的成员函数。",
+        "不必捕获 bad_weak_ptr；它能反映错误调用时机。"
+      ],
+      "starter": "class Session : public std::enable_shared_from_this<Session> {\npublic:\n    std::shared_ptr<Session> self() {\n        // TODO: 共享原控制块\n        return {};\n    }\n};\n",
+      "solution": "class Session : public std::enable_shared_from_this<Session> {\npublic:\n    std::shared_ptr<Session> self() { return shared_from_this(); }\n};\n",
+      "tests": [
+        {
+          "name": "同一控制块",
+          "body": "auto p=std::make_shared<Session>();auto q=p->self();std::cout<<(q.get()==p.get())<<' '<<p.use_count()<<' '<<(!p.owner_before(q)&&!q.owner_before(p));",
+          "expected": "1 2 1",
+          "explanation": "地址相同，共享控制块，有两份强引用。"
+        },
+        {
+          "name": "多次调用",
+          "body": "auto p=std::make_shared<Session>();auto q=p->self();auto r=p->self();std::cout<<p.use_count();",
+          "expected": "3",
+          "explanation": "每次返回都应新增共享所有者。"
+        },
+        {
+          "name": "保活责任",
+          "body": "auto p=std::make_shared<Session>();std::weak_ptr<Session>w=p;auto q=p->self();p.reset();std::cout<<w.expired();q.reset();std::cout<<' '<<w.expired();",
+          "expected": "0 1",
+          "explanation": "返回值保活对象，直到释放。"
+        },
+        {
+          "name": "未建立所有权",
+          "body": "Session s;try{auto p=s.self();std::cout<<\"missing exception\";}catch(const std::bad_weak_ptr&){std::cout<<\"bad_weak_ptr\";}",
+          "expected": "bad_weak_ptr",
+          "explanation": "栈上直接创建的对象还没有共享所有权。"
+        }
+      ]
+    },
+    {
+      "id": "break-cycle",
+      "topic": "ownership",
+      "title": "让父子节点正确释放",
+      "subtitle": "ownership graph / weak parent",
+      "minutes": 25,
+      "difficulty": "巩固",
+      "objective": "实现 attach：父节点拥有子节点，子节点只观察父节点。外部所有者释放后，整条关系必须能被销毁。",
+      "contract": [
+        "parent 和 child 均非空。",
+        "本题只要求单子节点树，不要求重挂载。",
+        "Node::alive 用于检查对象是否真正销毁。"
+      ],
+      "guide": [
+        "所有权图中的强引用边表示保活责任，弱引用边表示观察关系。",
+        "双向 shared_ptr 容易形成引用环。外部所有者释放后，环中的强引用仍可能无法归零。",
+        "父拥有子、子观察父是本题选择的生命周期策略。真实业务也可采用集中拥有，但需要先明确责任。"
+      ],
+      "hints": [
+        "需要建立两个方向的关系。",
+        "parent->child 是强引用，child->parent 是弱引用。"
+      ],
+      "starter": "struct Node {\n    inline static int alive = 0;\n    std::shared_ptr<Node> child;\n    std::weak_ptr<Node> parent;\n    Node() { ++alive; }\n    ~Node() { --alive; }\n};\nvoid attach(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& child) {\n    // TODO: 建立拥有与观察关系\n}\n",
+      "solution": "struct Node {\n    inline static int alive = 0;\n    std::shared_ptr<Node> child;\n    std::weak_ptr<Node> parent;\n    Node() { ++alive; }\n    ~Node() { --alive; }\n};\nvoid attach(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& child) {\n    parent->child = child;\n    child->parent = parent;\n}\n",
+      "tests": [
+        {
+          "name": "双向关系",
+          "body": "auto p=std::make_shared<Node>();auto c=std::make_shared<Node>();attach(p,c);bool linked=c->parent.lock()==p;std::cout<<(p->child==c)<<' '<<linked<<' '<<p.use_count()<<' '<<c.use_count();",
+          "expected": "1 1 1 2",
+          "explanation": "只有父到子的边增加强引用。"
+        },
+        {
+          "name": "完整释放",
+          "body": "{auto p=std::make_shared<Node>();auto c=std::make_shared<Node>();attach(p,c);}std::cout<<Node::alive;",
+          "expected": "0",
+          "explanation": "不能残留强引用环。"
+        },
+        {
+          "name": "父节点先销毁",
+          "body": "auto c=std::make_shared<Node>();{auto p=std::make_shared<Node>();attach(p,c);}std::cout<<c->parent.expired()<<' '<<Node::alive;",
+          "expected": "1 1",
+          "explanation": "外部仍持有子节点时，父节点可以独立销毁。"
+        },
+        {
+          "name": "三层关系",
+          "body": "{auto a=std::make_shared<Node>();auto b=std::make_shared<Node>();auto c=std::make_shared<Node>();attach(a,b);attach(b,c);b.reset();c.reset();std::cout<<Node::alive<<' ';}std::cout<<Node::alive;",
+          "expected": "3 0",
+          "explanation": "整条拥有链应自动回收。"
+        }
+      ]
+    },
+    {
+      "id": "unique-transfer",
+      "topic": "ownership",
+      "title": "把独占资源交给新拥有者",
+      "subtitle": "unique_ptr / move / ownership transfer",
+      "minutes": 20,
+      "difficulty": "巩固",
+      "objective": "实现 install：把 incoming 的独占所有权移入 slot，释放 slot 原来的资源。函数返回后 incoming 为空。同一个 unique_ptr 被传入两次时保持原内容。",
+      "contract": [
+        "禁止复制 Player，禁止泄漏旧资源。",
+        "移动后 Player 地址不变。"
+      ],
+      "guide": [
+        "unique_ptr 移动转移的是资源管理责任，不是把堆上的 Player 搬到另一个地址。",
+        "移动赋值的目标可能已经拥有资源，需要正确释放旧资源。",
+        "std::move 本身只是值类别转换，实际转移由移动赋值操作完成。"
+      ],
+      "hints": [
+        "使用 unique_ptr 的移动赋值，不要手动拼接 release()。",
+        "先比较两个参数对象的地址来处理自转移。"
+      ],
+      "starter": "void install(std::unique_ptr<Player>& slot, std::unique_ptr<Player>& incoming) {\n    // TODO: 转移独占所有权\n}\n",
+      "solution": "void install(std::unique_ptr<Player>& slot, std::unique_ptr<Player>& incoming) {\n    if (&slot != &incoming) slot = std::move(incoming);\n}\n",
+      "tests": [
+        {
+          "name": "空槽位",
+          "body": "std::unique_ptr<Player>a;auto b=std::make_unique<Player>(75);auto raw=b.get();install(a,b);std::cout<<(a.get()==raw)<<' '<<bool(b)<<' '<<Player::alive;",
+          "expected": "1 0 1",
+          "explanation": "资源地址不变，拥有者变化。"
+        },
+        {
+          "name": "替换资源",
+          "body": "auto a=std::make_unique<Player>(1);auto b=std::make_unique<Player>(2);install(a,b);std::cout<<(a?a->hp:-1)<<' '<<bool(b)<<' '<<Player::alive;",
+          "expected": "2 0 1",
+          "explanation": "目标原有资源应销毁。"
+        },
+        {
+          "name": "空 incoming",
+          "body": "auto a=std::make_unique<Player>();std::unique_ptr<Player>b;install(a,b);std::cout<<bool(a)<<' '<<Player::alive;",
+          "expected": "0 0",
+          "explanation": "空输入会清空原槽位。"
+        },
+        {
+          "name": "自转移",
+          "body": "auto a=std::make_unique<Player>(99);auto raw=a.get();install(a,a);std::cout<<(a.get()==raw)<<' '<<(a?a->hp:-1);",
+          "expected": "1 99",
+          "explanation": "自转移按契约保持原对象。"
+        }
+      ]
+    },
+    {
+      "id": "alias-member",
+      "topic": "ownership",
+      "title": "访问成员，保活整个对象",
+      "subtitle": "aliasing constructor / stored pointer",
+      "minutes": 25,
+      "difficulty": "进阶",
+      "objective": "实现 health_view：返回指向 Player::hp 的 shared_ptr<int>，并共享 Player 的控制块。即使外部 Player 指针释放，视图仍保持 Player 存活。",
+      "contract": [
+        "不能返回成员的独立副本。",
+        "owner 为空时返回空 shared_ptr<int>。"
+      ],
+      "guide": [
+        "stored pointer 决定访问哪个地址，control block 决定参与哪份所有权。两者不必代表相同类型的对象。",
+        "aliasing constructor 接收已有拥有者和一个访问地址。成员视图通过共享所有权保活整个对象。",
+        "shared_ptr<int>(&owner->hp) 会错误地建立独立释放责任。"
+      ],
+      "hints": [
+        "使用 shared_ptr(owner, ptr) 形式的别名构造。",
+        "先检查 owner，再取成员地址。"
+      ],
+      "starter": "std::shared_ptr<int> health_view(const std::shared_ptr<Player>& owner) {\n    // TODO: 创建共享控制块的成员视图\n    return {};\n}\n",
+      "solution": "std::shared_ptr<int> health_view(const std::shared_ptr<Player>& owner) {\n    if (!owner) return {};\n    return std::shared_ptr<int>(owner, &owner->hp);\n}\n",
+      "tests": [
+        {
+          "name": "原成员地址",
+          "body": "auto p=std::make_shared<Player>(60);auto q=health_view(p);std::cout<<(q.get()==&p->hp)<<' '<<p.use_count();",
+          "expected": "1 2",
+          "explanation": "访问原成员，且新增一份共享所有权。"
+        },
+        {
+          "name": "保活整个对象",
+          "body": "auto p=std::make_shared<Player>(83);auto q=health_view(p);p.reset();std::cout<<(q?*q:-1)<<' '<<Player::alive;q.reset();std::cout<<' '<<Player::alive;",
+          "expected": "83 1 0",
+          "explanation": "成员视图存在时 Player 不能销毁。"
+        },
+        {
+          "name": "修改原成员",
+          "body": "auto p=std::make_shared<Player>();auto q=health_view(p);if(q)*q=7;std::cout<<p->hp;",
+          "expected": "7",
+          "explanation": "不要复制成员。"
+        },
+        {
+          "name": "空 owner",
+          "body": "auto q=health_view({});std::cout<<bool(q);",
+          "expected": "0",
+          "explanation": "不解引用空 owner。"
+        },
+        {
+          "name": "所有权身份",
+          "body": "auto p=std::make_shared<Player>();auto q=health_view(p);std::cout<<(!p.owner_before(q)&&!q.owner_before(p));",
+          "expected": "1",
+          "explanation": "控制块应相同。"
+        }
+      ]
+    },
+    {
+      "id": "lifetime",
+      "topic": "objects",
+      "title": "空间准备好了，对象呢？",
+      "subtitle": "storage / construct_at / destroy_at",
+      "minutes": 20,
+      "difficulty": "复习",
+      "objective": "实现 create_widget 与 destroy_widget：在调用方提供的原始空间上构造 Widget；销毁时只结束对象生命周期，不释放调用方的空间。",
+      "contract": [
+        "storage 大小、对齐均满足 Widget 的要求。",
+        "Widget 由题目提供，包含 value 和静态 alive 计数。",
+        "destroy_widget 接收存活对象。"
+      ],
+      "guide": [
+        "存储与对象是不同概念。分配空间、构造对象、销毁对象、释放空间是四种不同操作。",
+        "placement new 或 construct_at 在指定位置构造，不另外分配对象存储。",
+        "destroy_at 结束对象生命周期，但不会释放存储。不能对这里的调用方栈空间执行 delete。"
+      ],
+      "hints": [
+        "将 void* 转为 Widget* 后使用 construct_at。",
+        "destroy_at 会调用析构函数。"
+      ],
+      "starter": "Widget* create_widget(void* storage, int value) {\n    // TODO: 在给定位置构造\n    return nullptr;\n}\nvoid destroy_widget(Widget* object) {\n    // TODO: 只销毁，不释放存储\n}\n",
+      "solution": "Widget* create_widget(void* storage, int value) {\n    return std::construct_at(static_cast<Widget*>(storage), value);\n}\nvoid destroy_widget(Widget* object) { std::destroy_at(object); }\n",
+      "tests": [
+        {
+          "name": "指定位置构造",
+          "body": "alignas(Widget)std::byte mem[sizeof(Widget)];auto p=create_widget(mem,42);std::cout<<(static_cast<void*>(p)==mem)<<' '<<(p?p->value:-1)<<' '<<Widget::alive;if(p)destroy_widget(p);",
+          "expected": "1 42 1",
+          "explanation": "需要构造，不只是转换指针。"
+        },
+        {
+          "name": "空间复用",
+          "body": "alignas(Widget)std::byte mem[sizeof(Widget)];auto p=create_widget(mem,7);if(p)destroy_widget(p);std::cout<<Widget::alive;auto q=create_widget(mem,9);std::cout<<' '<<(q?q->value:-1);if(q)destroy_widget(q);std::cout<<' '<<Widget::alive;",
+          "expected": "0 9 0",
+          "explanation": "旧对象销毁后重新构造。"
+        },
+        {
+          "name": "独立对象",
+          "body": "alignas(Widget)std::byte a[sizeof(Widget)],b[sizeof(Widget)];auto p=create_widget(a,-3);auto q=create_widget(b,15);std::cout<<Widget::alive<<' '<<(p?p->value:0)<<' '<<(q?q->value:0);if(p)destroy_widget(p);if(q)destroy_widget(q);",
+          "expected": "2 -3 15",
+          "explanation": "每次构造开始独立的生命周期。"
+        }
+      ]
+    },
+    {
+      "id": "align-up",
+      "topic": "layout",
+      "title": "计算下一处合法对齐位置",
+      "subtitle": "alignment / allocator prerequisite",
+      "minutes": 20,
+      "difficulty": "复习",
+      "objective": "实现 align_up，把 offset 向上取整到 alignment 的倍数。alignment 保证为非零的 2 的幂。若结果超出 size_t 范围，抛出 overflow_error。",
+      "contract": [
+        "已经对齐的 offset 保持不变。",
+        "不允许静默回绕到错误的偏移。"
+      ],
+      "guide": [
+        "alignment 表示对象可放置地址的要求，不是 padding 的字节数。",
+        "分配器需要把对齐增加的空隙计入容量消耗。",
+        "无符号回绕有语言定义，但回绕后的地址偏移不符合本题契约。需要先检查溢出。"
+      ],
+      "hints": [
+        "用余数计算 padding。",
+        "在相加前检查 offset > max - padding。"
+      ],
+      "starter": "std::size_t align_up(std::size_t offset, std::size_t alignment) {\n    // TODO: 对齐，并检查溢出\n    return offset;\n}\n",
+      "solution": "std::size_t align_up(std::size_t offset, std::size_t alignment) {\n    auto remainder = offset % alignment;\n    auto padding = remainder ? alignment - remainder : 0;\n    if (offset > std::numeric_limits<std::size_t>::max() - padding)\n        throw std::overflow_error(\"alignment overflow\");\n    return offset + padding;\n}\n",
+      "tests": [
+        {
+          "name": "跨越边界",
+          "body": "std::cout<<align_up(13,8);",
+          "expected": "16",
+          "explanation": "13 后第一个 8 的倍数是 16。"
+        },
+        {
+          "name": "已经对齐",
+          "body": "std::cout<<align_up(16,8)<<' '<<align_up(0,64);",
+          "expected": "16 0",
+          "explanation": "不额外增加一个单位。"
+        },
+        {
+          "name": "连续偏移",
+          "body": "for(std::size_t i=1;i<=5;++i)std::cout<<align_up(i,4)<<' ';",
+          "expected": "4 4 4 4 8",
+          "explanation": "覆盖边界两侧。"
+        },
+        {
+          "name": "单位对齐",
+          "body": "auto m=std::numeric_limits<std::size_t>::max();std::cout<<(align_up(m,1)==m);",
+          "expected": "1",
+          "explanation": "alignment=1 不增加 padding。"
+        },
+        {
+          "name": "溢出",
+          "body": "try{align_up(std::numeric_limits<std::size_t>::max(),8);std::cout<<\"missed\";}catch(const std::overflow_error&){std::cout<<\"overflow\";}",
+          "expected": "overflow",
+          "explanation": "不能静默回绕。"
+        }
+      ]
+    },
+    {
+      "id": "value-equality",
+      "topic": "layout",
+      "title": "比较值，而不是整块字节",
+      "subtitle": "object representation / padding / memcmp",
+      "minutes": 20,
+      "difficulty": "复习",
+      "objective": "实现 same_value，比较 Record 的 id、active、weight 是否相等。weight 按普通 double 的 == 语义比较。",
+      "contract": [
+        "+0.0 与 -0.0 相等；NaN 与自身不相等。",
+        "结果不得依赖 padding 字节。"
+      ],
+      "guide": [
+        "对象表示包含组成对象的字节，也可能包含 padding。值相等不意味着所有表示字节相同。",
+        "即使不考虑 padding，正零与负零也能具有不同表示而数值相等。",
+        "trivially copyable 的字节复制保证，并不能推出 memcmp 就是正确的语义相等操作。"
+      ],
+      "hints": [
+        "逐个比较逻辑字段。",
+        "三个比较使用逻辑与连接。"
+      ],
+      "starter": "struct Record { char id; bool active; double weight; };\nbool same_value(const Record& a, const Record& b) {\n    // TODO: 按字段比较\n    return false;\n}\n",
+      "solution": "struct Record { char id; bool active; double weight; };\nbool same_value(const Record& a, const Record& b) {\n    return a.id == b.id && a.active == b.active && a.weight == b.weight;\n}\n",
+      "tests": [
+        {
+          "name": "相同字段",
+          "body": "Record a{'x',true,2.5},b{'x',true,2.5};std::cout<<same_value(a,b);",
+          "expected": "1",
+          "explanation": "逻辑字段相同。"
+        },
+        {
+          "name": "正零与负零",
+          "body": "Record a{'x',true,0.0},b{'x',true,-0.0};std::cout<<same_value(a,b);",
+          "expected": "1",
+          "explanation": "不同表示可以具有相同数值。"
+        },
+        {
+          "name": "NaN",
+          "body": "Record a{'x',true,std::numeric_limits<double>::quiet_NaN()};std::cout<<same_value(a,a);",
+          "expected": "0",
+          "explanation": "采用 double 的 == 语义。"
+        },
+        {
+          "name": "覆盖全部字段",
+          "body": "Record a{'x',true,2.5};std::cout<<same_value(a,Record{'y',true,2.5})<<same_value(a,Record{'x',false,2.5})<<same_value(a,Record{'x',true,3.5});",
+          "expected": "000",
+          "explanation": "不能遗漏某个字段。"
+        }
+      ]
+    },
+    {
+      "id": "move-buffer",
+      "topic": "move",
+      "title": "为 Buffer 实现移动操作",
+      "subtitle": "rule of five / noexcept / moved-from state",
+      "minutes": 35,
+      "difficulty": "进阶",
+      "objective": "补全 Buffer 的移动构造和移动赋值，转移已有数组的所有权。移动后源对象为空；自移动保持原内容。",
+      "contract": [
+        "移动操作不得分配新数组，data() 地址跟随所有权转移。",
+        "禁止复制，移动必须 noexcept。",
+        "移动赋值需要释放目标旧数组。"
+      ],
+      "guide": [
+        "移动构造创建新对象，再转移资源管理责任。源对象仍存在。",
+        "移动赋值的目标本来就存在，因此还需要处理它原有的资源。",
+        "本题规定 moved-from 状态为空。不要把这一具体约定泛化到所有 C++ 类型。"
+      ],
+      "hints": [
+        "std::exchange 可以取出指针并将源置为 nullptr。",
+        "移动赋值先检查 this != &other，再释放旧数组。"
+      ],
+      "starter": "class Buffer {\n    int* data_ = nullptr;\n    std::size_t size_ = 0;\npublic:\n    explicit Buffer(std::size_t n) : data_(n ? new int[n]{} : nullptr), size_(n) {}\n    ~Buffer() { delete[] data_; }\n    Buffer(const Buffer&) = delete;\n    Buffer& operator=(const Buffer&) = delete;\n    Buffer(Buffer&& other) noexcept {\n        // TODO\n    }\n    Buffer& operator=(Buffer&& other) noexcept {\n        // TODO\n        return *this;\n    }\n    int* data() const { return data_; }\n    std::size_t size() const { return size_; }\n};\n",
+      "solution": "class Buffer {\n    int* data_ = nullptr;\n    std::size_t size_ = 0;\npublic:\n    explicit Buffer(std::size_t n) : data_(n ? new int[n]{} : nullptr), size_(n) {}\n    ~Buffer() { delete[] data_; }\n    Buffer(const Buffer&) = delete;\n    Buffer& operator=(const Buffer&) = delete;\n    Buffer(Buffer&& other) noexcept : data_(std::exchange(other.data_,nullptr)), size_(std::exchange(other.size_,0)) {}\n    Buffer& operator=(Buffer&& other) noexcept {\n        if (this != &other) {\n            delete[] data_;\n            data_ = std::exchange(other.data_,nullptr);\n            size_ = std::exchange(other.size_,0);\n        }\n        return *this;\n    }\n    int* data() const { return data_; }\n    std::size_t size() const { return size_; }\n};\n",
+      "tests": [
+        {
+          "name": "移动构造",
+          "body": "Buffer a(3);a.data()[0]=42;auto raw=a.data();Buffer b(std::move(a));std::cout<<(b.data()==raw)<<' '<<b.size()<<' '<<(b.data()?b.data()[0]:-1)<<' '<<a.size()<<' '<<(a.data()==nullptr);",
+          "expected": "1 3 42 0 1",
+          "explanation": "转移资源，源仍存在但为空。"
+        },
+        {
+          "name": "移动赋值",
+          "body": "Buffer a(2),b(5);a.data()[1]=9;auto raw=a.data();b=std::move(a);std::cout<<(b.data()==raw)<<' '<<b.size()<<' '<<(b.data()?b.data()[1]:-1)<<' '<<a.size();",
+          "expected": "1 2 9 0",
+          "explanation": "接管源数组并清空源。"
+        },
+        {
+          "name": "自移动",
+          "body": "Buffer a(2);auto p=a.data();a=std::move(a);std::cout<<(a.data()==p)<<' '<<a.size();",
+          "expected": "1 2",
+          "explanation": "按契约保留自移动内容。"
+        },
+        {
+          "name": "空 Buffer",
+          "body": "Buffer a(0),b(4);b=std::move(a);std::cout<<(b.data()==nullptr)<<' '<<b.size()<<' '<<a.size();",
+          "expected": "1 0 0",
+          "explanation": "空资源也能正确转移。"
+        },
+        {
+          "name": "类型约束",
+          "body": "std::cout<<std::is_nothrow_move_constructible_v<Buffer><<' '<<std::is_nothrow_move_assignable_v<Buffer><<' '<<std::is_copy_constructible_v<Buffer>;",
+          "expected": "1 1 0",
+          "explanation": "独占类型禁止复制，移动无抛出。"
+        },
+        {
+          "name": "移动赋值与析构不泄漏数组",
+          "body": "{Buffer a(2),b(5); b=std::move(a);}std::cout<<liveArrays;",
+          "expected": "0",
+          "explanation": "通过测试夹具统计 new[] / delete[]，检查目标旧资源和最终资源都被释放。"
+        }
+      ],
+      "preamble": "inline int liveArrays = 0;\nvoid* operator new[](std::size_t n) { void* p=std::malloc(n?n:1); if(!p)throw std::bad_alloc(); ++liveArrays; return p; }\nvoid operator delete[](void* p) noexcept { if(p){--liveArrays;std::free(p);} }\nvoid operator delete[](void* p,std::size_t) noexcept { operator delete[](p); }\n"
+    },
+    {
+      "id": "arena",
+      "topic": "allocator",
+      "title": "TinyRuntime 前置实验：线性 Arena",
+      "subtitle": "alignment / capacity / reset",
+      "minutes": 40,
+      "difficulty": "项目练习",
+      "objective": "实现 Arena::allocate 和 reset，在固定 256 字节存储里按顺序分配。容量不足返回 nullptr，并保持原分配位置。",
+      "contract": [
+        "bytes > 0；alignment 为非零 2 的幂，不超过 alignof(max_align_t)。",
+        "成功分配的区域对齐且不重叠。",
+        "reset 只回收空间，调用方负责此前对象的析构。"
+      ],
+      "guide": [
+        "Arena 通过推进偏移完成分配，但它并不自动管理各个对象的析构。",
+        "对齐增加的 padding 和请求字节都要占用容量。失败时保持状态不变。",
+        "这只是 TinyRuntime 的前置存储实验，后续还需加入对象管理策略、容器和实际工程验证。"
+      ],
+      "hints": [
+        "std::align 可以在候选地址和剩余空间上检查容量与对齐。",
+        "先使用临时变量，成功后再更新 used_。"
+      ],
+      "starter": "class Arena {\n    alignas(std::max_align_t) std::byte storage_[256];\n    std::size_t used_ = 0;\npublic:\n    void* allocate(std::size_t bytes, std::size_t alignment) {\n        // TODO: 失败不得推进 used_\n        return nullptr;\n    }\n    void reset() { /* TODO */ }\n    std::size_t used() const { return used_; }\n};\n",
+      "solution": "class Arena {\n    alignas(std::max_align_t) std::byte storage_[256];\n    std::size_t used_ = 0;\npublic:\n    void* allocate(std::size_t bytes, std::size_t alignment) {\n        void* p = storage_ + used_;\n        std::size_t space = sizeof(storage_) - used_;\n        if (!std::align(alignment,bytes,p,space)) return nullptr;\n        used_ = static_cast<std::byte*>(p) - storage_ + bytes;\n        return p;\n    }\n    void reset() { used_ = 0; }\n    std::size_t used() const { return used_; }\n};\n",
+      "tests": [
+        {
+          "name": "基本分配",
+          "body": "Arena a;auto p=a.allocate(8,8);std::cout<<(p!=nullptr)<<' '<<a.used()<<' '<<(reinterpret_cast<std::uintptr_t>(p)%8==0);",
+          "expected": "1 8 1",
+          "explanation": "返回合法对齐地址。"
+        },
+        {
+          "name": "padding 与不重叠",
+          "body": "Arena a;auto p=a.allocate(1,1);auto q=a.allocate(8,8);std::cout<<(p&&q)<<' '<<a.used()<<' '<<(p&&q?static_cast<std::byte*>(q)-static_cast<std::byte*>(p):-1);",
+          "expected": "1 16 8",
+          "explanation": "包含 7 字节 padding。"
+        },
+        {
+          "name": "容量耗尽",
+          "body": "Arena a;auto p=a.allocate(256,1);auto q=a.allocate(1,1);std::cout<<bool(p)<<' '<<bool(q)<<' '<<a.used();",
+          "expected": "1 0 256",
+          "explanation": "失败不推进状态。"
+        },
+        {
+          "name": "失败后小分配",
+          "body": "Arena a;auto p=a.allocate(300,1);auto q=a.allocate(4,4);std::cout<<bool(p)<<' '<<bool(q)<<' '<<a.used();",
+          "expected": "0 1 4",
+          "explanation": "失败不污染状态。"
+        },
+        {
+          "name": "重置与复用",
+          "body": "Arena a;auto p=a.allocate(16,8);a.reset();auto q=a.allocate(16,8);std::cout<<(p&&p==q)<<' '<<a.used();",
+          "expected": "1 16",
+          "explanation": "重置复用原空间。"
+        },
+        {
+          "name": "对齐边界容量",
+          "body": "Arena a;a.allocate(249,1);auto p=a.allocate(8,8);std::cout<<bool(p)<<' '<<a.used();",
+          "expected": "0 249",
+          "explanation": "容量判断包含对齐损耗。"
+        }
+      ]
+    }
+  ]
+}
