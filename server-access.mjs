@@ -7,8 +7,8 @@ export function serverAccess(env=process.env,port=3210){
   if(!/^[a-z0-9][a-z0-9-]{1,100}$/.test(name||'')||domain!=='app.github.dev')throw new Error('Invalid Codespaces forwarding environment');
   external=`https://${name}-${port}.${domain}`;
   origins.add(external);hosts.add(new URL(external).host);
-  // Codespaces rewrites Host to localhost before forwarding to the loopback server.
-  hosts.add('localhost:'+port);
+  // Codespaces rewrites same-site Host and Origin to localhost on forwarding.
+  hosts.add('localhost:'+port);origins.add('http://localhost:'+port);
  }
  return {origin:external||'http://'+local,codespaces:!!external,allows(req){
   const navigation=!!external&&req.method==='GET'&&req.url==='/'&&req.headers['sec-fetch-mode']==='navigate'&&req.headers['sec-fetch-dest']==='document';
